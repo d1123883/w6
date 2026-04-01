@@ -1,0 +1,14 @@
+{
+  "name": "gemini-weather-agent",
+  "version": "1.0.0",
+  "description": "A Gemini-based LLM agent with weather tool",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.3.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.0.0"
+  }
+}

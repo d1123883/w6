@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Pro Skill Agent - 開發者透視版</title>
+    <!-- 引入 PDF.js & JSON Formatter -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.8);
+            --accent: #10b981;
+            --text: #f8fafc;
+            --warning: #f59e0b;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #020617;
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- Sidebar --- */
+        .sidebar {
+            width: 320px;
+            background: var(--bg-dark);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            gap: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .card h3 { margin: 0 0 0.75rem 0; font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* --- Main Content --- */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #000;
+        }
+
+        .tabs {
+            display: flex;
+            background: #1e293b;
+            padding: 0.5rem 1rem 0 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tab {
+            padding: 0.5rem 1.5rem;
+            cursor: pointer;
+            border-radius: 0.5rem 0.5rem 0 0;
+            font-size: 0.9rem;
+            color: #94a3b8;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: var(--bg-dark);
+            color: white;
+            border-top: 2px solid var(--primary);
+        }
+
+        /* --- Chat View --- */
+        #view-chat, #view-prompt { height: 100%; display: flex; flex-direction: column; }
+        .hidden { display: none !important; }
+
+        #chat-output {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 1rem 1.5rem;
+            border-radius: 1rem;
+            line-height: 1.6;
+            font-size: 1rem;
+            animation: fadeIn 0.4s cubic-bezier(0, 0, 0.2, 1);
+            white-space: pre-wrap;
+        }
+
+        .user-msg { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 0.2rem; }
+        .ai-msg { align-self: flex-start; background: #1e293b; border-bottom-left-radius: 0.2rem; border: 1px solid rgba(255, 255, 255, 0.1); }
+
+        .input-area {
+            padding: 1.5rem;
+            background: #0f172a;
+            display: flex;
+            gap: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        input[type="text"], input[type="password"] {
+            flex: 1;
+            background: #000;
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: white;
+            outline: none;
+        }
+
+        input:focus { border-color: var(--primary); }
+
+        button {
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-skill { background: var(--accent); color: white; width: 100%; margin-top: 0.5rem; }
+
+        /* --- Prompt Insight View --- */
+        #prompt-container {
+            flex: 1;
+            background: #050505;
+            padding: 1rem;
+            overflow-y: auto;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .json-block {
+            background: #111;
+            border: 1px solid #333;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            color: #10b981;
+        }
+
+        .json-label { color: var(--warning); margin-bottom: 0.5rem; display: block; font-weight: bold; }
+
+        /* --- Animations --- */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- Tool Call Indicator --- */
+        .tool-indicator { font-size: 0.75rem; color: var(--warning); border-left: 2px solid var(--warning); padding-left: 0.5rem; margin: 0.5rem 0; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div style="text-align: center; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.1rem; margin:0;">Gemini Pro Skill Agent</h2>
+        <span style="font-size: 0.7rem; color: #64748b;">Version 3.0 (Modular Skills)</span>
+    </div>
+
+    <div class="card">
+        <h3>API 設定</h3>
+        <input type="password" id="api-key" placeholder="貼上 API Key..." value="AIzaSyAUEM_gENJOBkOQKxSBurTeukXhvXeM-y0">
+    </div>
+
+    <div class="card">
+        <h3>PDF 知識庫</h3>
+        <input type="file" id="pdf-upload" accept=".pdf" multiple style="display: none;" onchange="handlePdfUpload(event)">
+        <button class="btn-skill" onclick="document.getElementById('pdf-upload').click()">上傳文件</button>
+        <div id="pdf-list" style="margin-top: 0.5rem; font-size: 0.7rem;">未載入 PDF</div>
+    </div>
+
+    <div class="card">
+        <h3>程式碼審核 (Skill)</h3>
+        <input type="file" id="code-upload" accept=".py,.js,.html,.css" multiple style="display: none;" onchange="handleCodeUpload(event)">
+        <button class="btn-skill" style="background: var(--primary);" onclick="document.getElementById('code-upload').click()">載入 Code 資料夾/檔案</button>
+        <div id="code-list" style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--accent); font-weight: bold;">未載入程式碼</div>
+    </div>
+
+    <div class="card" style="margin-top: auto;">
+        <h3>執行日誌</h3>
+        <div id="status-log" style="font-size: 0.7rem; color: #10b981; height: 100px; overflow-y: auto; background: #000; padding: 0.5rem;">
+            System ready.
+        </div>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('chat')">💬 聊天對話</div>
+        <div class="tab" onclick="switchTab('prompt')">🔍 Prompt 洞察</div>
+    </div>
+
+    <div id="view-chat">
+        <div id="chat-output"></div>
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="問問天氣、PDF 內容或程式審查..." onkeypress="if(event.key === 'Enter') startChat()">
+            <button class="btn-primary" onclick="startChat()">發送</button>
+        </div>
+    </div>
+
+    <div id="view-prompt" class="hidden">
+        <div id="prompt-container">
+            <div style="color: #64748b; text-align: center; margin-top: 2rem;">尚未發送請求，開始對話後此處將顯示完整 Prompt。</div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+
+    let pdfContents = [];
+    // 預載測試用瑕疵程式碼 (V3.1 支援)
+    let codeContents = [
+        { 
+            name: "bad1.py", 
+            content: `import sqlite3\nu = "root"\np = "123456"\ndef login(userInput):\n    global u\n    global p\n    db = sqlite3.connect('local.db')\n    c = db.cursor()\n    q = "SELECT * FROM users WHERE username = '" + userInput + "' AND password = '" + p + "'"\n    c.execute(q)\n    r = c.fetchone()\n    return "Success" if r else "Fail"`
+        },
+        {
+            name: "bad2.py",
+            content: `import os\ndef a(x):\n    if x > 0:\n        if x < 100:\n            if x % 2 == 0:\n                return x * 2\ndef run(cmd):\n    os.system("echo " + cmd)\ns = input("What to echo? ")\nrun(s)`
+        }
+    ];
+    let promptHistory = [];
+
+    // --- UI 控制 ---
+    window.onload = () => {
+        const savedKey = localStorage.getItem('gemini_api_key');
+        if (savedKey) {
+            document.getElementById('api-key').value = savedKey;
+            addLog("已載入儲存的 API Key。");
+        }
+        document.getElementById('code-list').innerHTML = `<span style="color: #10b981;">✅ 已預載 2 個測試檔案 (bad1, bad2)</span>`;
+        addLog("V3.1 準備就緒：已預載測試用程式碼。");
+    };
+
+    window.switchTab = (tab) => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelector(`.tab:nth-child(${tab === 'chat' ? 1 : 2})`).classList.add('active');
+        document.getElementById('view-chat').classList.toggle('hidden', tab !== 'chat');
+        document.getElementById('view-prompt').classList.toggle('hidden', tab !== 'prompt');
+    };
+
+    function addLog(msg) {
+        const log = document.getElementById('status-log');
+        log.innerHTML += `<div>> ${msg}</div>`;
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function updatePromptInsight(label, data) {
+        const container = document.getElementById('prompt-container');
+        if (container.innerText.includes('尚未發送')) container.innerHTML = '';
+        
+        const block = document.createElement('div');
+        block.className = 'json-block';
+        block.innerHTML = `<span class="json-label">// ${label}</span><pre>${JSON.stringify(data, null, 2)}</pre>`;
+        container.appendChild(block);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // --- 檔案處理 Skill ---
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+    window.handlePdfUpload = async (e) => {
+        addLog("正在解析 PDF...");
+        for (const file of e.target.files) {
+            const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+            let text = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                text += (await page.getTextContent()).items.map(item => item.str).join(' ') + "\n";
+            }
+            pdfContents.push({ name: file.name, content: text });
+        }
+        document.getElementById('pdf-list').innerHTML = pdfContents.map(p => `📄 ${p.name}`).join('<br>');
+        addLog(`PDF 載入完成 (${pdfContents.length} 檔案)`);
+    };
+
+    window.handleCodeUpload = async (e) => {
+        addLog("正在讀取程式碼...");
+        for (const file of e.target.files) {
+            const text = await file.text();
+            codeContents.push({ name: file.name, content: text });
+        }
+        document.getElementById('code-list').innerHTML = codeContents.map(c => `🐍 ${c.name}`).join('<br>');
+        addLog(`Code 載入完成 (${codeContents.length} 檔案)`);
+    };
+
+    // --- 工具定義 (Tools) ---
+    const tools = [
+        {
+            functionDeclarations: [
+                {
+                    name: "getWeather",
+                    description: "取得某個城市的天氣。",
+                    parameters: { type: "OBJECT", properties: { location: { type: "STRING" } }, required: ["location"] }
+                },
+                {
+                    name: "readFileForAnalysis",
+                    description: "讀取已上傳的 PDF 或原始碼檔案內容，以便進行專業分析。你不需要知道檔名，直接傳入空字串即可獲取全部檔案。",
+                    parameters: { 
+                        type: "OBJECT", 
+                        properties: { 
+                            query: { type: "STRING", description: "請傳入空字串 \"\" 即可讀取全部內容，絕對不要詢問使用者檔名。" }, 
+                            type: { type: "STRING", enum: ["pdf", "code"], description: "如果是程式碼請傳入 \"code\"" } 
+                        }, 
+                        required: ["query", "type"] 
+                    }
+                }
+            ]
+        }
+    ];
+
+    // --- 工具執行邏輯 ---
+    async function executeTool(name, args) {
+        addLog(`執行工具: ${name}`);
+        if (name === "getWeather") {
+            const res = await fetch(`https://wttr.in/${args.location}?format=j1`);
+            const data = await res.json();
+            return { temp: data.current_condition[0].temp_C, desc: data.current_condition[0].weatherDesc[0].value };
+        }
+        if (name === "readFileForAnalysis") {
+            const source = args.type === "pdf" ? pdfContents : codeContents;
+            if (source.length === 0) return { status: "知識庫是空的，請要求使用者點擊左側按鈕上傳檔案。" };
+            
+            // 如果關鍵字為空或不存在，回傳所有內容
+            const matches = (!args.query || args.query.trim() === "") ? source : source.filter(f => f.content.toLowerCase().includes(args.query.toLowerCase()) || f.name.includes(args.query));
+            
+            if (matches.length > 0) {
+                return { 
+                    found: matches.length, 
+                    results: matches.map(m => `[File: ${m.name}]\n${m.content.substring(0, 10000)}`) 
+                };
+            } else {
+                return { found: 0, status: "查無此關鍵字，目前載入的檔案有：" + source.map(f => f.name).join(', ') };
+            }
+        }
+    }
+
+    // --- Agent 核心對話 ---
+    window.startChat = async () => {
+        const apiKey = document.getElementById('api-key').value;
+        const userInput = document.getElementById('user-input');
+        const text = userInput.value.trim();
+        if (!text || !apiKey) return;
+
+        appendMsg(text, true);
+        userInput.value = '';
+
+        try {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ 
+                model: "gemini-2.5-flash",
+                systemInstruction: "你是一個專業的 AI Agent，具備『程式碼審核專家』Skill。\n" +
+                                   "🚨 絕對不要詢問使用者檔名或類型！ 🚨\n" +
+                                   "1. 當使用者要求分析程式碼時，請「立刻、馬上」調用 readFileForAnalysis 工具。\n" +
+                                   "2. 調用工具時，直接將 query 設為空字串 \"\"，type 設為 \"code\"，這樣就能抓到所有預載的檔案。\n" +
+                                   "3. 取得檔案內容後，請針對『撰寫風格、邏輯、安全性與可讀性』進行詳細報告。"
+            });
+
+            const chat = model.startChat({ tools: tools });
+            
+            // --- 監控點：發送請求 ---
+            updatePromptInsight(`REQUEST TO GEMINI`, { model: "gemini-2.5-flash", user_input: text, active_tools: tools[0].functionDeclarations });
+
+            let result;
+            try {
+                result = await chat.sendMessage(text);
+            } catch (e) {
+                addLog(`Tool call syntax error: ${e.message}`);
+                appendMsg(`通訊失敗，請檢查 API Key 或模型版本是否支援。錯誤: ${e.message}`, false);
+                return;
+            }
+            
+            let response = result.response;
+
+            // 工具循環
+            let limit = 0;
+            while (limit++ < 10) {
+                if (!response.candidates || response.candidates.length === 0 || !response.candidates[0].content) break;
+                
+                const parts = response.candidates[0].content.parts || [];
+                const calls = parts.filter(p => p.functionCall);
+                
+                if (calls.length === 0) break;
+
+                const funcResponses = [];
+                for (const call of calls) {
+                    try {
+                        const toolResult = await executeTool(call.functionCall.name, call.functionCall.args);
+                        updatePromptInsight(`TOOL RESULT [${call.functionCall.name}]`, { args: call.functionCall.args, result: toolResult });
+                        funcResponses.push({ functionResponse: { name: call.functionCall.name, response: toolResult } });
+                    } catch (e) {
+                         addLog(`Error executing tool ${call.functionCall.name}: ${e.message}`);
+                         funcResponses.push({ functionResponse: { name: call.functionCall.name, response: { error: e.message } } });
+                    }
+                }
+                
+                let result;
+                try {
+                    result = await chat.sendMessage(funcResponses);
+                } catch (e) {
+                    addLog(`Error sending tool result: ${e.message}`);
+                    appendMsg(`回傳工具結果失敗: ${e.message}`, false);
+                    break;
+                }
+                response = result.response;
+            }
+
+            appendMsg(response.text(), false);
+            updatePromptInsight(`FINAL RESPONSE content`, response.candidates[0].content);
+        } catch (err) {
+            addLog(`ERROR: ${err.message}`);
+            appendMsg(`Error: ${err.message}`, false);
+        }
+    };
+
+    function appendMsg(text, isUser) {
+        const chat = document.getElementById('chat-output');
+        const d = document.createElement('div');
+        d.className = `message ${isUser ? 'user-msg' : 'ai-msg'}`;
+        d.textContent = text;
+        chat.appendChild(d);
+        chat.scrollTop = chat.scrollHeight;
+    }
+</script>
+
+</body>
+</html>

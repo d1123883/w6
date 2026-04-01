@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Architecture Dashboard</title>
+    <!-- 引入 Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 27, 34, 0.6);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.5);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 40%);
+            background-size: cover;
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 24px;
+            padding: 40px 0;
+        }
+
+        /* 毛玻璃共用樣式 */
+        .glass-panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* 側邊欄 */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 0%, #a8b2d1 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .brand::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        .nav-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nav-item {
+            padding: 12px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+        }
+
+        .nav-item.active {
+            border-left: 3px solid var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        /* 主內容區 */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* 狀態卡片網格 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .stat-unit {
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* 架構視圖 */
+        .architecture-view {
+            flex: 1;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 模組節點 */
+        .nodes-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            position: relative;
+        }
+
+        .node {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .node::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transform: translateX(-100%);
+            transition: 0.5s;
+        }
+
+        .node:hover::before {
+            transform: translateX(100%);
+        }
+
+        .node-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: rgba(59, 130, 246, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.2);
+        }
+
+        .node-title { font-weight: 500; font-size: 1.1rem; }
+        .node-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+
+        /* 狀態指示燈 */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            position: absolute;
+            top: 16px;
+            right: 16px;
+        }
+
+        .status-online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .status-busy { background: var(--warning); box-shadow: 0 0 8px var(--warning); animation: pulse 2s infinite; }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* 動態資料流橫幅 */
+        .data-stream {
+            margin-top: auto;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .data-stream::before {
+            content: '>>';
+            color: var(--primary);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 側邊欄 -->
+        <aside class="sidebar glass-panel">
+            <div class="brand">Nexus Agent</div>
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item active">網格拓撲 (Topology)</li>
+                    <li class="nav-item">記憶體監控 (Memory)</li>
+                    <li class="nav-item">工具鏈狀態 (Tools)</li>
+                    <li class="nav-item">日誌與除錯 (Logs)</li>
+                    <li class="nav-item">設定檔 (Settings)</li>
+                </ul>
+            </nav>
+            
+            <div style="margin-top: auto;">
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">系統連線狀態</div>
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.9rem;">
+                    <span class="status-dot status-online" style="position: static;"></span>
+                    全部系統上線
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主內容 -->
+        <main class="main-content">
+            <!-- 數據區 -->
+            <div class="stats-grid">
+                <div class="stat-card glass-panel">
+                    <div class="stat-label">推理延遲 (Latency)</div>
+                    <div class="stat-value">245 <span class="stat-unit">ms</span></div>
+                </div>
+                <div class="stat-card glass-panel">
+                    <div class="stat-label">Token 消耗量</div>
+                    <div class="stat-value">12.5 <span class="stat-unit">k/hr</span></div>
+                </div>
+                <div class="stat-card glass-panel">
+                    <div class="stat-label">神經叢集負載</div>
+                    <div class="stat-value">38 <span class="stat-unit">%</span></div>
+                </div>
+            </div>
+
+            <!-- 架構圖區 -->
+            <div class="architecture-view glass-panel">
+                <h2 class="section-title">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                    神經架構拓撲
+                </h2>
+                
+                <div class="nodes-container">
+                    <!-- 核心模型 -->
+                    <div class="node">
+                        <div class="status-dot status-online"></div>
+                        <div class="node-icon" style="color: #60a5fa; background: rgba(96, 165, 250, 0.1);">🧠</div>
+                        <div class="node-title">LLM Kernel</div>
+                        <div class="node-desc">主要決策核心，負責意圖解析與指令生成。</div>
+                    </div>
+                    
+                    <!-- 記憶體區塊 -->
+                    <div class="node">
+                        <div class="status-dot status-busy"></div>
+                        <div class="node-icon" style="color: #c084fc; background: rgba(192, 132, 252, 0.1);">💾</div>
+                        <div class="node-title">Vector Memory</div>
+                        <div class="node-desc">RAG 向量資料庫，正在寫入短期會話上下文。</div>
+                    </div>
+
+                    <!-- 工具呼叫系統 -->
+                    <div class="node">
+                        <div class="status-dot status-online"></div>
+                        <div class="node-icon" style="color: #34d399; background: rgba(52, 211, 153, 0.1);">🛠️</div>
+                        <div class="node-title">Tool Executor</div>
+                        <div class="node-desc">管理外部 API、天氣查詢、PDF解析等工具協定。</div>
+                    </div>
+                </div>
+
+                <div class="data-stream" style="margin-top: 24px;">
+                    [SYSTEM_LOG.INFO]: received tool_call from LLM { tool: 'readFileForAnalysis', status: 'executing' } ...
+                </div>
+            </div>
+        </main>
+    </div>
+
+</body>
+</html>
